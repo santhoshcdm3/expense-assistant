@@ -7,8 +7,8 @@
 - `netlify.toml`: Netlify configuration (publishes the `frontend` folder).
 
 Oracle APEX endpoints used by `frontend/index.html`:
-- `https://oracleapex.com/ords/app_exp/gt/expenses`
-- `https://oracleapex.com/ords/app_exp/frmto/exp/dates`
+- `/api/expenses` -> mapped to Oracle APEX endpoint via Netlify
+- `/api/dates` -> mapped to Oracle APEX endpoint via Netlify
 
 ## How to Run (local backend)
 1. **Backend**:

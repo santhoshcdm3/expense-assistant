@@ -286,7 +286,7 @@
                 handleFormSubmit(new Event('submit'));
             };
 
-recognition.onend = () => {
+            recognition.onend = () => {
                 isRecording = false;
                 micBtn.classList.remove("bg-rose-600", "animate-pulse");
                 voiceStatus.classList.add("hidden");
