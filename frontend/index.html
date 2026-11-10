@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Assistant Chatbot</title>
+    <title>Expense Assistant Chatbot (Oracle APEX)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -36,9 +36,9 @@
                     <i class="fa-solid fa-robot"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg text-white">Expense Chatbot</h1>
+                    <h1 class="font-bold text-lg text-white">Expense Chatbot (Oracle APEX)</h1>
                     <p class="text-xs text-emerald-400 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Online & Listening (ta-IN)
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected to ORDS APEX Backend
                     </p>
                 </div>
             </div>
@@ -56,8 +56,8 @@
                     <div class="flex items-start space-x-3">
                         <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs shrink-0">🤖</div>
                         <div class="bg-slate-800 text-slate-200 p-3.5 rounded-2xl rounded-tl-none max-w-md border border-slate-700 shadow-sm space-y-2">
-                            <p>Hello! 👋 I'm your Expense Assistant.</p>
-                            <p class="text-sm text-slate-400">You can type or speak in <b>Tamil</b> (e.g., <i>"Tea ku 50 rupees kuduthen"</i>) and I will log it for you!</p>
+                            <p>Hello! 👋 I'm your Expense Assistant connected to Oracle APEX REST endpoints.</p>
+                            <p class="text-sm text-slate-400">You can type or speak in <b>Tamil</b> (e.g., <i>"Tea ku 50 rupees kuduthen"</i>) and I will log it!</p>
                         </div>
                     </div>
                 </div>
@@ -98,23 +98,23 @@
                         <div class="space-y-2 text-xs">
                             <div>
                                 <label class="text-slate-400">Single Date</label>
-                                <input type="date" id="filterSingleDate" onchange="fetchExpenses()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 mt-1">
+                                <input type="date" id="filterSingleDate" onchange="fetchApexExpenses()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 mt-1">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
                                     <label class="text-slate-400">Start Date</label>
-                                    <input type="date" id="filterStartDate" onchange="fetchExpenses()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 mt-1">
+                                    <input type="date" id="filterStartDate" onchange="fetchApexExpenses()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 mt-1">
                                 </div>
                                 <div>
                                     <label class="text-slate-400">End Date</label>
-                                    <input type="date" id="filterEndDate" onchange="fetchExpenses()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 mt-1">
+                                    <input type="date" id="filterEndDate" onchange="fetchApexExpenses()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 mt-1">
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <h3 class="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3">Logged Records</h3>
+                        <h3 class="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3">Oracle APEX Records</h3>
                         <div id="recordsList" class="space-y-2 max-h-48 overflow-y-auto text-xs pr-1"></div>
                     </div>
                 </div>
@@ -128,7 +128,9 @@
     </div>
 
     <script>
-        const API_URL = "http://localhost:8000";
+        const EXPENSES_API = "https://oracleapex.com/ords/app_exp/gt/expenses";
+        const DATES_API = "https://oracleapex.com/ords/app_exp/frmto/exp/dates";
+        const TARGET_HASH = "fe5c7fb1f689a05a5f0abe6588a9dbc91f258821e22c2ea773afde776b32bd6e";
 
         async function hashPin(pin) {
             const encoder = new TextEncoder();
@@ -138,8 +140,6 @@
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
-        const TARGET_HASH = "fe5c7fb1f689a05a5f0abe6588a9dbc91f258821e22c2ea773afde776b32bd6e";
-
         async function verifyPasscode(e) {
             e.preventDefault();
             const input = document.getElementById("passcodeInput").value;
@@ -148,18 +148,28 @@
             if (inputHash === TARGET_HASH) {
                 document.getElementById("authModal").classList.add("hidden");
                 document.getElementById("appContent").classList.remove("hidden");
-                fetchExpenses();
+                fetchApexExpenses();
             } else {
                 document.getElementById("authError").classList.remove("hidden");
                 document.getElementById("passcodeInput").value = "";
             }
         }
 
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function formatBot(msg) {
+            return escapeHtml(msg)
+                .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+                .replace(/\*(.+?)\*/g, '<i>$1</i>');
+        }
+
         function appendUserMessage(msg) {
             const container = document.getElementById("chatMessages");
             const div = document.createElement("div");
             div.className = "flex items-start justify-end space-x-3";
-            div.innerHTML = `<div class="bg-indigo-600 text-white p-3.5 rounded-2xl rounded-tr-none max-w-md shadow-sm"><p class="text-sm">${msg}</p></div>`;
+            div.innerHTML = `<div class="bg-indigo-600 text-white p-3.5 rounded-2xl rounded-tr-none max-w-md shadow-sm"><p class="text-sm">${escapeHtml(msg)}</p></div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
@@ -168,7 +178,7 @@
             const container = document.getElementById("chatMessages");
             const div = document.createElement("div");
             div.className = "flex items-start space-x-3";
-            div.innerHTML = `<div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs shrink-0">🤖</div><div class="bg-slate-800 text-slate-200 p-3.5 rounded-2xl rounded-tl-none max-w-md border border-slate-700 shadow-sm"><p class="text-sm">${msg}</p></div>`;
+            div.innerHTML = `<div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs shrink-0">🤖</div><div class="bg-slate-800 text-slate-200 p-3.5 rounded-2xl rounded-tl-none max-w-md border border-slate-700 shadow-sm"><p class="text-sm">${formatBot(msg)}</p></div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
@@ -188,8 +198,8 @@
             input.value = "";
 
             if (text.toLowerCase().includes("show") || text.toLowerCase().includes("fetch")) {
-                await fetchExpenses();
-                appendBotMessage("Here are your latest expenses fetched from the backend!");
+                await fetchApexExpenses();
+                appendBotMessage("Here are your latest expenses fetched from Oracle APEX!");
                 return;
             }
 
@@ -234,20 +244,20 @@
             };
 
             try {
-                const res = await fetch(`${API_URL}/expenses`, {
+                const res = await fetch(EXPENSES_API, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
-                    appendBotMessage(`✅ Logged expense: **${payload.title}** for **₹${payload.amount}** under *${payload.category}*!`);
-                    fetchExpenses();
+                    appendBotMessage(`✅ Logged to Oracle APEX: **${payload.title}** for **₹${payload.amount}** under *${payload.category}*!`);
+                    fetchApexExpenses();
                 } else {
-                    appendBotMessage("⚠️ Backend error. Make sure FastAPI server is running on port 8000.");
+                    appendBotMessage("⚠️ Oracle APEX API returned an error status.");
                 }
             } catch (err) {
-                appendBotMessage("❌ Could not connect to API server at http://localhost:8000.");
+                appendBotMessage("❌ Could not connect to Oracle APEX endpoint (CORS or network issue).");
             }
         }
 
@@ -286,7 +296,7 @@
                 handleFormSubmit(new Event('submit'));
             };
 
-recognition.onend = () => {
+            recognition.onend = () => {
                 isRecording = false;
                 micBtn.classList.remove("bg-rose-600", "animate-pulse");
                 voiceStatus.classList.add("hidden");
@@ -295,16 +305,17 @@ recognition.onend = () => {
             recognition.start();
         }
 
-        async function fetchExpenses() {
-            let url = `${API_URL}/expenses?`;
+        async function fetchApexExpenses() {
             const singleDate = document.getElementById("filterSingleDate").value;
             const startDate = document.getElementById("filterStartDate").value;
             const endDate = document.getElementById("filterEndDate").value;
 
-            if (singleDate) url += `single_date=${singleDate}`;
-            else {
-                if (startDate) url += `start_date=${startDate}&`;
-                if (endDate) url += `end_date=${endDate}`;
+            let url = EXPENSES_API;
+
+            if (startDate && endDate) {
+                url = `${DATES_API}?start_date=${startDate}&end_date=${endDate}`;
+            } else if (singleDate) {
+                url = `${DATES_API}?single_date=${singleDate}`;
             }
 
             try {
@@ -315,17 +326,31 @@ recognition.onend = () => {
                 list.innerHTML = "";
                 let sum = 0;
 
-                data.expenses.forEach(exp => {
-                    sum += exp.amount;
+                const items = data.items || data.expenses || [];
+
+                if (items.length === 0) {
+                    list.innerHTML = `<div class="text-slate-400 italic">No records found.</div>`;
+                    document.getElementById("totalSum").innerText = "₹0.00";
+                    return;
+                }
+
+                items.forEach(exp => {
+                    const amt = Number(exp.amount || exp.AMOUNT || 0);
+                    sum += amt;
+                    const itemTitle = exp.title || exp.TITLE || exp.description || "Expense";
+                    const itemDate = exp.expense_date || exp.EXPENSE_DATE || exp.date || "";
+                    const itemCat = exp.category || exp.CATEGORY || "General";
+
                     const item = document.createElement("div");
                     item.className = "bg-slate-900 border border-slate-700 p-2 rounded flex justify-between items-center";
-                    item.innerHTML = `<div><div class="font-semibold text-slate-200">${exp.title}</div><div class="text-[10px] text-slate-400">${exp.expense_date} • ${exp.category}</div></div><div class="font-bold text-rose-400">₹${exp.amount.toFixed(2)}</div>`;
+                    item.innerHTML = `<div><div class="font-semibold text-slate-200">${escapeHtml(itemTitle)}</div><div class="text-[10px] text-slate-400">${escapeHtml(itemDate)} • ${escapeHtml(itemCat)}</div></div><div class="font-bold text-rose-400">₹${Number(amt).toFixed(2)}</div>`;
                     list.appendChild(item);
                 });
 
                 document.getElementById("totalSum").innerText = `₹${sum.toFixed(2)}`;
             } catch (err) {
-                console.error("Fetch error", err);
+                console.error("APEX Fetch error", err);
+                document.getElementById("recordsList").innerHTML = `<div class="text-rose-400 text-[10px]">Failed to load Oracle APEX records (CORS policy or endpoint offline).</div>`;
             }
         }
 
