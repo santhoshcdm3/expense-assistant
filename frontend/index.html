@@ -9,6 +9,9 @@
 </head>
 <body class="bg-slate-900 text-slate-100 h-screen flex flex-col font-sans">
 
+    <!-- Toast notifications -->
+    <div id="toasts" class="fixed top-4 right-4 z-[60] space-y-2"></div>
+
     <!-- Passcode Lock Modal -->
     <div id="authModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
@@ -37,14 +40,28 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg text-white">Expense Chatbot (Oracle APEX)</h1>
-                    <p class="text-xs text-emerald-400 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected to ORDS APEX Backend
+                    <p id="overallStatus" class="text-xs text-amber-400 flex items-center gap-1">
+                        <span id="overallDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span id="overallText">Checking Oracle APEX...</span>
                     </p>
                 </div>
             </div>
-            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white">
-                <i class="fa-solid fa-chart-pie text-xl"></i>
-            </button>
+            <div class="flex items-center gap-2">
+                <div id="pill-expenses" title="Checking..." class="hidden sm:flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-full px-2.5 py-1 text-[10px] text-slate-300">
+                    <span id="light-expenses" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span>Expenses API</span><span id="ms-expenses" class="text-slate-500"></span>
+                </div>
+                <div id="pill-dates" title="Checking..." class="hidden sm:flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-full px-2.5 py-1 text-[10px] text-slate-300">
+                    <span id="light-dates" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span>Dates API</span><span id="ms-dates" class="text-slate-500"></span>
+                </div>
+                <button onclick="checkEndpoints()" title="Re-check connection" class="text-slate-400 hover:text-white text-sm">
+                    <i id="recheckIcon" class="fa-solid fa-rotate"></i>
+                </button>
+                <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-chart-pie text-xl"></i>
+                </button>
+            </div>
         </header>
 
         <div class="flex flex-1 overflow-hidden">
@@ -79,11 +96,11 @@
                 <div class="p-4 bg-slate-800/50 border-t border-slate-700/50">
                     <form id="chatForm" onsubmit="handleFormSubmit(event)" class="flex items-center gap-2">
                         <button type="button" id="micBtn" onclick="toggleVoiceRecognition()" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-rose-600 text-slate-200 hover:text-white transition flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-microphone"></i>
+                            <i id="micIcon" class="fa-solid fa-microphone"></i>
                         </button>
                         <input type="text" id="userInput" placeholder="Type or click mic to speak Tamil..." class="flex-1 bg-slate-800 border border-slate-700 text-slate-100 text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500">
-                        <button type="submit" class="w-11 h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg">
-                            <i class="fa-solid fa-paper-plane"></i>
+                        <button type="submit" id="sendBtn" class="w-11 h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg">
+                            <i id="sendIcon" class="fa-solid fa-paper-plane"></i>
                         </button>
                     </form>
                     <div id="voiceStatus" class="text-xs text-slate-400 mt-1 pl-14 italic hidden"></div>
@@ -114,8 +131,15 @@
                     </div>
 
                     <div>
-                        <h3 class="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3">Oracle APEX Records</h3>
+                        <h3 class="font-bold text-sm text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                            <span>Oracle APEX Records</span>
+                            <span id="recordsLoading" class="hidden text-indigo-400 normal-case text-[10px] font-normal"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</span>
+                        </h3>
                         <div id="recordsList" class="space-y-2 max-h-48 overflow-y-auto text-xs pr-1"></div>
+                        <div class="flex justify-between text-[10px] text-slate-500 mt-2">
+                            <span id="recordCount">-</span>
+                            <span id="lastSync">Not synced yet</span>
+                        </div>
                     </div>
                 </div>
 
@@ -159,6 +183,122 @@
             return [];
         }
 
+
+        // ---------- Status lights & indicators ----------
+        const LIGHT_STYLE = {
+            checking: ["bg-amber-400 animate-pulse", "0 0 8px #fbbf24", "Checking..."],
+            online:   ["bg-emerald-400", "0 0 8px #34d399", "Online"],
+            offline:  ["bg-rose-500", "0 0 8px #f43f5e", "Offline"]
+        };
+        const lights = { expenses: "checking", dates: "checking" };
+
+        function setLight(kind, state, detail = "", ms = null) {
+            lights[kind] = state;
+            const dot = document.getElementById("light-" + kind);
+            const [cls, glow, label] = LIGHT_STYLE[state];
+            dot.className = "w-2.5 h-2.5 rounded-full " + cls;
+            dot.style.boxShadow = glow;
+            document.getElementById("pill-" + kind).title = label + (detail ? " - " + detail : "");
+            document.getElementById("ms-" + kind).innerText = (state === "online" && ms !== null) ? ms + "ms" : "";
+            updateOverallStatus();
+        }
+
+        function updateOverallStatus() {
+            const states = Object.values(lights);
+            const online = states.filter(x => x === "online").length;
+            let state, text, textColor;
+            if (online === states.length) { state = "online"; text = "Oracle APEX online"; textColor = "text-emerald-400"; }
+            else if (states.includes("checking")) { state = "checking"; text = "Checking Oracle APEX..."; textColor = "text-amber-400"; }
+            else if (online > 0) { state = "checking"; text = "Oracle APEX partially online"; textColor = "text-amber-400"; }
+            else { state = "offline"; text = "Oracle APEX offline"; textColor = "text-rose-400"; }
+            const dotCls = state === "online" ? "bg-emerald-400" : state === "offline" ? "bg-rose-500" : "bg-amber-400 animate-pulse";
+            document.getElementById("overallStatus").className = "text-xs flex items-center gap-1 " + textColor;
+            document.getElementById("overallDot").className = "w-2 h-2 rounded-full " + dotCls;
+            document.getElementById("overallText").innerText = text;
+        }
+
+        let checking = false;
+        async function checkEndpoints() {
+            if (checking) return;
+            checking = true;
+            const icon = document.getElementById("recheckIcon");
+            icon.classList.add("fa-spin");
+            ["expenses", "dates"].forEach(k => setLight(k, "checking"));
+            const today = new Date().toISOString().split("T")[0];
+            await Promise.all(["expenses", "dates"].map(async kind => {
+                const t0 = performance.now();
+                try {
+                    const q = kind === "dates" ? `?single_date=${today}` : "";
+                    const r = await apexFetch(kind, q, {}, true);
+                    const ms = Math.round(performance.now() - t0);
+                    if (r.ok) setLight(kind, "online", "HTTP " + r.status, ms);
+                    else setLight(kind, "offline", "HTTP " + r.status);
+                } catch (e) {
+                    setLight(kind, "offline", e.message || "Network error / CORS");
+                }
+            }));
+            icon.classList.remove("fa-spin");
+            checking = false;
+        }
+
+        function showToast(msg, type = "info") {
+            const colors = { success: "bg-emerald-600", error: "bg-rose-600", info: "bg-indigo-600", warn: "bg-amber-600" };
+            const icons = { success: "fa-circle-check", error: "fa-circle-xmark", info: "fa-circle-info", warn: "fa-triangle-exclamation" };
+            const t = document.createElement("div");
+            t.className = `${colors[type]} text-white text-xs px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-opacity duration-300`;
+            t.innerHTML = `<i class="fa-solid ${icons[type]}"></i><span>${escapeHtml(msg)}</span>`;
+            document.getElementById("toasts").appendChild(t);
+            setTimeout(() => { t.style.opacity = "0"; setTimeout(() => t.remove(), 300); }, 3000);
+        }
+
+        function showTyping(text) {
+            hideTyping();
+            const container = document.getElementById("chatMessages");
+            const div = document.createElement("div");
+            div.id = "typingIndicator";
+            div.className = "flex items-start space-x-3";
+            div.innerHTML = `<div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs shrink-0">🤖</div><div class="bg-slate-800 text-slate-300 p-3 rounded-2xl rounded-tl-none border border-slate-700 shadow-sm flex items-center gap-2"><span class="flex gap-1"><span class="inline-block w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:0ms"></span><span class="inline-block w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:150ms"></span><span class="inline-block w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay:300ms"></span></span><span id="typingText" class="text-xs italic">${escapeHtml(text)}</span></div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+        function setTyping(text) {
+            const el = document.getElementById("typingText");
+            if (el) el.innerText = text;
+        }
+        function hideTyping() {
+            const el = document.getElementById("typingIndicator");
+            if (el) el.remove();
+        }
+
+        let busy = false;
+        function setBusy(b) {
+            busy = b;
+            document.getElementById("userInput").disabled = b;
+            const btn = document.getElementById("sendBtn");
+            btn.disabled = b;
+            btn.classList.toggle("opacity-60", b);
+            document.getElementById("sendIcon").className = b ? "fa-solid fa-spinner fa-spin" : "fa-solid fa-paper-plane";
+        }
+
+        function setLoading(b) {
+            document.getElementById("recordsLoading").classList.toggle("hidden", !b);
+        }
+
+        function markSynced(count) {
+            document.getElementById("recordCount").innerText = count + (count === 1 ? " record" : " records");
+            document.getElementById("lastSync").innerText = "Synced " + new Date().toLocaleTimeString();
+        }
+
+        window.addEventListener("offline", () => {
+            setLight("expenses", "offline", "No internet");
+            setLight("dates", "offline", "No internet");
+            showToast("You are offline", "error");
+        });
+        window.addEventListener("online", () => {
+            showToast("Back online", "success");
+            checkEndpoints();
+        });
+
         async function hashPin(pin) {
             const encoder = new TextEncoder();
             const data = encoder.encode(pin + "salt_secure");
@@ -175,9 +315,13 @@
             if (inputHash === TARGET_HASH) {
                 document.getElementById("authModal").classList.add("hidden");
                 document.getElementById("appContent").classList.remove("hidden");
+                showToast("Unlocked", "success");
+                checkEndpoints();
+                if (!window.__statusTimer) window.__statusTimer = setInterval(checkEndpoints, 30000);
                 fetchApexExpenses();
             } else {
                 document.getElementById("authError").classList.remove("hidden");
+                showToast("Incorrect passcode", "error");
                 document.getElementById("passcodeInput").value = "";
             }
         }
@@ -217,24 +361,36 @@
 
         async function handleFormSubmit(e) {
             e.preventDefault();
+            if (busy) return;
             const input = document.getElementById("userInput");
             const text = input.value.trim();
             if (!text) return;
 
             appendUserMessage(text);
             input.value = "";
+            setBusy(true);
 
-            if (text.toLowerCase().includes("show") || text.toLowerCase().includes("fetch")) {
-                await fetchApexExpenses();
-                appendBotMessage("Here are your latest expenses fetched from Oracle APEX!");
-                return;
+            try {
+                if (text.toLowerCase().includes("show") || text.toLowerCase().includes("fetch")) {
+                    showTyping("Fetching records from Oracle APEX...");
+                    const ok = await fetchApexExpenses();
+                    hideTyping();
+                    appendBotMessage(ok
+                        ? "Here are your latest expenses fetched from Oracle APEX!"
+                        : "⚠️ Couldn't fetch records. Check the connection lights at the top.");
+                } else {
+                    await parseAndSaveInput(text);
+                }
+            } finally {
+                hideTyping();
+                setBusy(false);
+                input.focus();
             }
-
-            await parseAndSaveInput(text);
         }
 
         async function parseAndSaveInput(rawText) {
             let translatedText = rawText;
+            showTyping("Translating...");
             try {
                 const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(rawText)}&langpair=ta|en`);
                 const data = await response.json();
@@ -243,6 +399,7 @@
                 }
             } catch (err) {
                 console.warn("Translation fallback");
+                showToast("Translation unavailable, using your original text", "warn");
             }
 
             const numberMatch = translatedText.match(/\d+(\.\d+)?/);
@@ -270,6 +427,7 @@
                 expense_date: new Date().toISOString().split('T')[0]
             };
 
+            setTyping("Saving to Oracle APEX...");
             try {
                 const res = await apexFetch("expenses", "", {
                     method: "POST",
@@ -279,12 +437,17 @@
 
                 if (res.ok) {
                     appendBotMessage(`✅ Logged to Oracle APEX: **${payload.title}** for **₹${payload.amount}** under *${payload.category}*!`);
+                    setLight("expenses", "online", "HTTP " + res.status);
+                    showToast("Saved to Oracle APEX", "success");
                     fetchApexExpenses();
                 } else {
+                    showToast("Save failed (HTTP " + res.status + ")", "error");
                     const detail = (await res.text()).slice(0, 150);
                     appendBotMessage(`⚠️ Oracle APEX returned error ${res.status}. ${detail}`);
                 }
             } catch (err) {
+                setLight("expenses", "offline", err.message);
+                showToast("Could not reach Oracle APEX", "error");
                 appendBotMessage("❌ Could not connect to Oracle APEX endpoint (CORS or network issue): " + err.message);
             }
         }
@@ -314,18 +477,25 @@
             recognition.onstart = () => {
                 isRecording = true;
                 micBtn.classList.add("bg-rose-600", "animate-pulse");
-                voiceStatus.innerText = "Listening in Tamil...";
+                voiceStatus.innerText = "Listening in Tamil... speak now";
+                document.getElementById("micIcon").className = "fa-solid fa-stop";
                 voiceStatus.classList.remove("hidden");
             };
 
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
+                showToast("Heard: " + transcript, "info");
                 document.getElementById("userInput").value = transcript;
                 handleFormSubmit(new Event('submit'));
             };
 
+            recognition.onerror = (event) => {
+                showToast("Voice error: " + event.error, "error");
+            };
+
             recognition.onend = () => {
                 isRecording = false;
+                document.getElementById("micIcon").className = "fa-solid fa-microphone";
                 micBtn.classList.remove("bg-rose-600", "animate-pulse");
                 voiceStatus.classList.add("hidden");
             };
@@ -349,6 +519,8 @@
                 query = `?single_date=${singleDate}`;
             }
 
+            setLoading(true);
+            const t0 = performance.now();
             try {
                 const res = await apexFetch(kind, query, {}, true);
                 const raw = await res.text();
@@ -361,12 +533,14 @@
                 list.innerHTML = "";
                 let sum = 0;
 
+                setLight(kind, "online", "HTTP " + res.status, Math.round(performance.now() - t0));
                 const items = extractItems(data);
 
                 if (items.length === 0) {
                     list.innerHTML = `<div class="text-slate-400 italic">No records found.</div>`;
                     document.getElementById("totalSum").innerText = "₹0.00";
-                    return;
+                    markSynced(0);
+                    return true;
                 }
 
                 items.forEach(exp => {
@@ -383,9 +557,16 @@
                 });
 
                 document.getElementById("totalSum").innerText = `₹${sum.toFixed(2)}`;
+                markSynced(items.length);
+                return true;
             } catch (err) {
+                setLight(kind, "offline", err.message);
+                showToast("Could not load records", "error");
                 console.error("APEX Fetch error", err);
                 document.getElementById("recordsList").innerHTML = `<div class="text-rose-400 text-[10px]">Failed to load Oracle APEX records: ${escapeHtml(err.message)}</div>`;
+                return false;
+            } finally {
+                setLoading(false);
             }
         }
 
