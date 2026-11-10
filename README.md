@@ -1,3 +1,7 @@
-# Expense Assistant
+# Expense Assistant - Gemini AI Theme
 
-Layout-fixed Netlify deployment package.
+AI-style expense tracking interface with Oracle APEX ORDS backend integration.
+
+## Setup & Deployment
+1. Push to GitHub repository.
+2. Link repository to Netlify with build directory `frontend`.

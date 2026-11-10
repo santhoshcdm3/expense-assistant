@@ -1,28 +1,28 @@
 [build]
   publish = "frontend"
 
-# 1. Add Expense
+# 1. Add New Expense Endpoint
 [[redirects]]
   from = "/api/add_exp/newexp"
   to = "https://oracleapex.com/ords/app_exp/add_exp/newexp"
   status = 200
   force = true
 
-# 2. Get All Expenses
+# 2. Get All Expenses Endpoint
 [[redirects]]
   from = "/api/gt/expenses"
   to = "https://oracleapex.com/ords/app_exp/gt/expenses"
   status = 200
   force = true
 
-# 3. Filter Expenses by Dates
+# 3. Filter Expenses by Dates Endpoint
 [[redirects]]
   from = "/api/frmto/exp/dates"
   to = "https://oracleapex.com/ords/app_exp/frmto/exp/dates"
   status = 200
   force = true
 
-# 4. Catch-all fallback proxy for any future /api/* routes
+# 4. Catch-all fallback proxy
 [[redirects]]
   from = "/api/*"
   to = "https://oracleapex.com/ords/app_exp/:splat"
