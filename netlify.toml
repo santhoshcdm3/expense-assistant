@@ -1,11 +1,2 @@
 [build]
   publish = "frontend"
-  command = "echo 'No build step required for static frontend'"
-
-[[redirects]]
-  from = "/api/*"
-  to = "http://localhost:8000/:splat"
-  status = 200
-
-[build.environment]
-  PYTHON_VERSION = "3.10"

@@ -138,7 +138,7 @@
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
-        const TARGET_HASH = "b328a649ff5bc8e1fbe0fb0800b65f377c8e96ffbb3a8f5fef89e240212d2b51";
+        const TARGET_HASH = "fe5c7fb1f689a05a5f0abe6588a9dbc91f258821e22c2ea773afde776b32bd6e";
 
         async function verifyPasscode(e) {
             e.preventDefault();
@@ -286,7 +286,7 @@
                 handleFormSubmit(new Event('submit'));
             };
 
-            recognition.onend = () => {
+recognition.onend = () => {
                 isRecording = false;
                 micBtn.classList.remove("bg-rose-600", "animate-pulse");
                 voiceStatus.classList.add("hidden");
