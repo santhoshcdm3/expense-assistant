@@ -135,14 +135,29 @@
             dates: "https://oracleapex.com/ords/app_exp/frmto/exp/dates"
         };
 
-        async function apexFetch(kind, query = "", options = {}) {
+        async function apexFetch(kind, query = "", options = {}, expectJson = false) {
             try {
                 const r = await fetch(PROXY[kind] + query, options);
-                if (r.status !== 404) return r;
+                const ct = r.headers.get("content-type") || "";
+                const proxyWorks = r.status !== 404 && (!expectJson || ct.includes("json") || !r.ok);
+                if (proxyWorks) return r;
             } catch (e) { /* proxy unreachable, try direct */ }
             return fetch(DIRECT[kind] + query, options);
         }
-        const TARGET_HASH = "fe5c7fb1f689a05a5f0abe6588a9dbc91f258821e22c2ea773afde776b32bd6e";
+
+        // Accepts many JSON shapes: [..], {items:[..]}, {expenses:[..]}, {data:[..]}, or the first array found
+        function extractItems(data) {
+            if (Array.isArray(data)) return data;
+            if (data && typeof data === "object") {
+                for (const k of ["items", "expenses", "data", "results", "rows"]) {
+                    if (Array.isArray(data[k])) return data[k];
+                }
+                for (const k in data) {
+                    if (Array.isArray(data[k])) return data[k];
+                }
+            }
+            return [];
+        }
 
         async function hashPin(pin) {
             const encoder = new TextEncoder();
@@ -335,15 +350,18 @@
             }
 
             try {
-                const res = await apexFetch(kind, query);
-                if (!res.ok) throw new Error("HTTP " + res.status);
-                const data = await res.json();
+                const res = await apexFetch(kind, query, {}, true);
+                const raw = await res.text();
+                console.log("APEX response", res.status, raw.slice(0, 500));
+                if (!res.ok) throw new Error("HTTP " + res.status + " - " + raw.slice(0, 150));
+                let data;
+                try { data = JSON.parse(raw); } catch (e) { throw new Error("Response is not JSON: " + raw.slice(0, 150)); }
                 
                 const list = document.getElementById("recordsList");
                 list.innerHTML = "";
                 let sum = 0;
 
-                const items = data.items || data.expenses || [];
+                const items = extractItems(data);
 
                 if (items.length === 0) {
                     list.innerHTML = `<div class="text-slate-400 italic">No records found.</div>`;
