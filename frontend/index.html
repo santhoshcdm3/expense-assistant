@@ -5,119 +5,365 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expense Assistant - Oracle APEX</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .chat-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex flex-col justify-between">
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
 
-    <!-- Header -->
-    <header class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center">
-        <h1 class="text-xl font-bold flex items-center gap-2">💰 Expense Assistant (Oracle APEX)</h1>
-        <button onclick="resetPasscode()" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1 rounded transition">Reset Passcode</button>
-    </header>
-
-    <!-- Chat Box -->
-    <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 max-w-3xl w-full mx-auto">
-        <div class="flex items-start gap-3">
-            <div class="bg-gray-700 text-gray-200 p-3 rounded-lg max-w-lg">
-                👋 Hello! Type your expense command below (e.g., <code class="bg-gray-800 px-1 py-0.5 rounded text-green-400">Add lunch 15.50 Food</code>).
+    <!-- Header Navigation -->
+    <header class="glass sticky top-0 z-50 px-6 py-4 border-b border-slate-800/80 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-wallet text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    Expense Assistant
+                    <span class="text-[10px] uppercase font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full">Oracle APEX</span>
+                </h1>
+                <p class="text-xs text-slate-400 flex items-center gap-1.5">
+                    <span id="status-indicator" class="w-2 h-2 rounded-full bg-amber-400 inline-block animate-pulse"></span>
+                    <span id="status-text">Passcode Required</span>
+                </p>
             </div>
         </div>
-    </div>
+        <div class="flex items-center gap-2">
+            <button onclick="clearChat()" title="Clear Chat History" class="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-slate-300 hover:text-white transition text-xs flex items-center gap-1.5">
+                <i class="fa-solid fa-trash-can"></i>
+                <span class="hidden sm:inline">Clear</span>
+            </button>
+            <button onclick="resetPasscode()" class="px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 transition text-xs font-medium flex items-center gap-1.5">
+                <i class="fa-solid fa-lock"></i>
+                <span>Reset Auth</span>
+            </button>
+        </div>
+    </header>
 
-    <!-- Input Bar -->
-    <div class="bg-gray-800 p-4 border-t border-gray-700">
-        <form id="chat-form" onsubmit="handleUserSubmit(event)" class="max-w-3xl mx-auto flex gap-2">
-            <input type="text" id="user-input" placeholder="Type your message or expense..." 
-                class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-lg font-medium transition">Send</button>
-        </form>
-    </div>
+    <!-- Main Container -->
+    <main class="flex-1 overflow-hidden max-w-4xl w-full mx-auto p-4 flex flex-col">
+        
+        <!-- Chat History -->
+        <div id="chat-container" class="chat-scroll flex-1 overflow-y-auto space-y-4 pr-2 pb-4">
+            
+            <!-- Welcome System Banner -->
+            <div class="glass p-5 rounded-2xl border border-slate-800 shadow-xl space-y-3">
+                <div class="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>Getting Started</span>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    Welcome! Type your natural expense prompts or commands below. System requests require passcode authorization (<code class="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-700">1234</code>).
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+                    <button onclick="sendQuickPrompt('show yesterday expense')" class="text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-indigo-300 transition flex items-center justify-between group">
+                        <span><i class="fa-solid fa-calendar-day mr-2 text-indigo-400"></i>"show yesterday expense"</span>
+                        <i class="fa-solid fa-arrow-right opacity-0 group-hover:opacity-100 transition-opacity text-xs"></i>
+                    </button>
+                    <button onclick="sendQuickPrompt('add Lunch 15.50 Food')" class="text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-indigo-300 transition flex items-center justify-between group">
+                        <span><i class="fa-solid fa-circle-plus mr-2 text-emerald-400"></i>"add Lunch 15.50 Food"</span>
+                        <i class="fa-solid fa-arrow-right opacity-0 group-hover:opacity-100 transition-opacity text-xs"></i>
+                    </button>
+                    <button onclick="sendQuickPrompt('show today expense')" class="text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-indigo-300 transition flex items-center justify-between group">
+                        <span><i class="fa-solid fa-clock mr-2 text-amber-400"></i>"show today expense"</span>
+                        <i class="fa-solid fa-arrow-right opacity-0 group-hover:opacity-100 transition-opacity text-xs"></i>
+                    </button>
+                    <button onclick="sendQuickPrompt('list')" class="text-left p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-slate-300 hover:text-indigo-300 transition flex items-center justify-between group">
+                        <span><i class="fa-solid fa-list-check mr-2 text-sky-400"></i>"list" (All Expenses)</span>
+                        <i class="fa-solid fa-arrow-right opacity-0 group-hover:opacity-100 transition-opacity text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Input Area -->
+        <div class="mt-3">
+            <form id="chat-form" onsubmit="handleUserSubmit(event)" class="glass p-2 rounded-2xl border border-slate-800/90 flex items-center gap-2 shadow-2xl focus-within:border-indigo-500/60 transition">
+                <input type="text" id="user-input" placeholder="Type a message or command..." autocomplete="off"
+                    class="flex-1 bg-transparent px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
+                <button type="submit" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm shadow-md shadow-indigo-600/20 transition flex items-center gap-2">
+                    <span>Send</span>
+                    <i class="fa-solid fa-paper-plane text-xs"></i>
+                </button>
+            </form>
+        </div>
+
+    </main>
 
     <script>
-        const CORRECT_PASSCODE = "1234"; 
+        const CORRECT_PASSCODE = "1234";
         let awaitingPasscode = false;
+        let pendingCommand = null;
 
-        function appendMessage(sender, text, isError = false) {
+        document.addEventListener("DOMContentLoaded", () => {
+            updateAuthBadge();
+        });
+
+        function updateAuthBadge() {
+            const isAuth = sessionStorage.getItem("is_authenticated") === "true";
+            const indicator = document.getElementById("status-indicator");
+            const text = document.getElementById("status-text");
+
+            if (isAuth) {
+                indicator.className = "w-2 h-2 rounded-full bg-emerald-400 inline-block";
+                text.textContent = "Authenticated";
+                text.className = "text-emerald-400 font-medium";
+            } else {
+                indicator.className = "w-2 h-2 rounded-full bg-amber-400 inline-block animate-pulse";
+                text.textContent = "Passcode Required";
+                text.className = "text-amber-400 font-medium";
+            }
+        }
+
+        function appendMessage(sender, text, type = "normal") {
             const container = document.getElementById("chat-container");
             const div = document.createElement("div");
-            div.className = `flex ${sender === 'You' ? 'justify-end' : 'justify-start'}`;
+            
+            const isUser = sender === 'You';
+            div.className = `flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`;
+
+            let bubbleStyles = "bg-slate-800/90 text-slate-200 border-slate-700/60";
+            let iconHeader = '<i class="fa-solid fa-robot text-indigo-400 mr-2"></i>Assistant';
+
+            if (isUser) {
+                bubbleStyles = "bg-indigo-600 text-white border-indigo-500/50 shadow-lg shadow-indigo-600/20";
+                iconHeader = '<i class="fa-solid fa-user text-indigo-200 mr-2"></i>You';
+            } else if (type === "error") {
+                bubbleStyles = "bg-rose-950/60 text-rose-200 border-rose-800/60 shadow-lg shadow-rose-950/20";
+                iconHeader = '<i class="fa-solid fa-circle-exclamation text-rose-400 mr-2"></i>Error';
+            } else if (type === "system") {
+                bubbleStyles = "bg-slate-900/90 text-amber-300 border-amber-500/30 shadow-lg";
+                iconHeader = '<i class="fa-solid fa-shield-halved text-amber-400 mr-2"></i>Security';
+            } else if (type === "success") {
+                bubbleStyles = "bg-emerald-950/60 text-emerald-200 border-emerald-800/60 shadow-lg shadow-emerald-950/20";
+                iconHeader = '<i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i>Success';
+            }
+
             div.innerHTML = `
-                <div class="${sender === 'You' ? 'bg-indigo-600 text-white' : (isError ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-gray-200')} p-3 rounded-lg max-w-lg shadow">
-                    <strong>${sender}:</strong> ${text}
+                <div class="${bubbleStyles} border p-4 rounded-2xl max-w-xl text-xs sm:text-sm leading-relaxed shadow-sm">
+                    <div class="font-semibold text-xs opacity-80 mb-1 border-b border-white/10 pb-1 flex items-center">
+                        ${iconHeader}
+                    </div>
+                    <div class="whitespace-pre-wrap mt-1.5">${text}</div>
                 </div>
             `;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
 
+        function clearChat() {
+            const container = document.getElementById("chat-container");
+            container.innerHTML = `
+                <div class="glass p-5 rounded-2xl border border-slate-800 shadow-xl space-y-3">
+                    <div class="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>Chat Reset</span>
+                    </div>
+                    <p class="text-xs text-slate-300">Chat history cleared. Type your message or command below.</p>
+                </div>
+            `;
+        }
+
         function resetPasscode() {
             sessionStorage.removeItem("is_authenticated");
-            appendMessage("System", "🔒 Passcode cleared. Your next command will require verification.");
+            awaitingPasscode = false;
+            pendingCommand = null;
+            updateAuthBadge();
+            appendMessage("System", "🔒 Session authentication cleared. Next API request will require passcode verification.", "system");
+        }
+
+        function sendQuickPrompt(promptText) {
+            document.getElementById("user-input").value = promptText;
+            document.getElementById("chat-form").dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+
+        function getFormattedDate(offsetDays = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() - offsetDays);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         async function handleUserSubmit(e) {
             e.preventDefault();
             const inputField = document.getElementById("user-input");
-            const text = inputField.value.trim();
-            if (!text) return;
+            const rawText = inputField.value.trim();
+            if (!rawText) return;
 
-            appendMessage("You", text);
+            appendMessage("You", rawText);
             inputField.value = "";
 
             const isAuthenticated = sessionStorage.getItem("is_authenticated") === "true";
 
+            // Passcode Verification State
             if (awaitingPasscode) {
-                if (text === CORRECT_PASSCODE) {
+                if (rawText === CORRECT_PASSCODE) {
                     sessionStorage.setItem("is_authenticated", "true");
                     awaitingPasscode = false;
-                    appendMessage("System", "✅ Passcode correct! Processing your pending action...");
+                    updateAuthBadge();
+                    appendMessage("System", "✅ Passcode verified successfully! Resuming your request...", "success");
+                    if (pendingCommand) {
+                        const cmdToExec = pendingCommand;
+                        pendingCommand = null;
+                        await executeCommand(cmdToExec);
+                    }
                 } else {
-                    appendMessage("System", "❌ Incorrect passcode. Please try again:", true);
+                    appendMessage("System", "❌ Incorrect passcode. Please try again (Default: 1234):", "error");
                 }
                 return;
             }
 
+            // Enforce Authentication
             if (!isAuthenticated) {
                 awaitingPasscode = true;
-                appendMessage("System", "🔒 Please enter your passcode in the chat to unlock API actions:");
+                pendingCommand = rawText;
+                appendMessage("System", "🔒 Security Check: Enter passcode to execute API command:", "system");
                 return;
             }
 
-            await processCommand(text);
+            await executeCommand(rawText);
         }
 
-        async function processCommand(text) {
-            const parts = text.split(" ");
-            const cmd = parts[0].toLowerCase();
+        async function executeCommand(text) {
+            const lowerText = text.toLowerCase();
 
-            if (cmd === "add" && parts.length >= 4) {
+            // 1. Yesterday Query
+            if (lowerText.includes("yesterday")) {
+                const yesterdayStr = getFormattedDate(1);
+                appendMessage("Assistant", `🔍 Querying Oracle APEX for yesterday's records (${yesterdayStr})...`);
+                await fetchExpensesByDateRange(yesterdayStr, yesterdayStr);
+            }
+            // 2. Today Query
+            else if (lowerText.includes("today")) {
+                const todayStr = getFormattedDate(0);
+                appendMessage("Assistant", `🔍 Querying Oracle APEX for today's records (${todayStr})...`);
+                await fetchExpensesByDateRange(todayStr, todayStr);
+            }
+            // 3. Add Expense Command
+            else if (lowerText.startsWith("add")) {
+                const parts = text.split(" ").filter(p => p.length > 0);
+                if (parts.length < 4) {
+                    appendMessage("Assistant", "⚠️ Syntax hint: `add [Title] [Amount] [Category]` (e.g., `add Coffee 4.50 Food`)", "error");
+                    return;
+                }
                 const title = parts[1];
                 const amount = parseFloat(parts[2]);
                 const category = parts.slice(3).join(" ");
 
+                if (isNaN(amount)) {
+                    appendMessage("Assistant", "⚠️ Invalid amount specified. Please use numeric values.", "error");
+                    return;
+                }
+
                 try {
-                    const response = await fetch('/api/add_exp/newexp', {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                    const res = await fetch('/api/add_exp/newexp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title, amount, category })
                     });
 
-                    if (!response.ok) throw new Error(`Server returned ${response.status}`);
-                    const result = await response.json();
-                    appendMessage("Assistant", `✅ Expense added to Oracle APEX! (${title} - $${amount})`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+                    appendMessage("Assistant", `✅ Expense Saved to Database!
+
+• Title: ${title}
+• Amount: $${amount.toFixed(2)}
+• Category: ${category}`, "success");
                 } catch (err) {
-                    appendMessage("Assistant", `⚠️ Error calling API: ${err.message}`, true);
+                    appendMessage("Assistant", `⚠️ API Call Failed: ${err.message}`, "error");
                 }
-            } else if (cmd === "list" || cmd === "all") {
+            }
+            // 4. List All Expenses
+            else if (lowerText.includes("list") || lowerText.includes("all") || lowerText.includes("show expenses")) {
                 try {
-                    const response = await fetch('/api/gt/expenses', { method: "GET" });
-                    if (!response.ok) throw new Error(`Server returned ${response.status}`);
-                    const data = await response.json();
-                    appendMessage("Assistant", `📋 Expenses retrieved: ${JSON.stringify(data)}`);
+                    const res = await fetch('/api/gt/expenses', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+                    const data = await res.json();
+                    formatAndRenderExpenseList("All Recorded Expenses", data);
                 } catch (err) {
-                    appendMessage("Assistant", `⚠️ Error fetching expenses: ${err.message}`, true);
+                    appendMessage("Assistant", `⚠️ API Call Failed: ${err.message}`, "error");
                 }
+            }
+            // 5. Date Filter Query
+            else if (lowerText.startsWith("filter")) {
+                const parts = text.split(" ").filter(p => p.length > 0);
+                if (parts.length < 3) {
+                    appendMessage("Assistant", "⚠️ Syntax hint: `filter [YYYY-MM-DD] [YYYY-MM-DD]`", "error");
+                    return;
+                }
+                await fetchExpensesByDateRange(parts[1], parts[2]);
+            }
+            // Default Fallback Help
+            else {
+                appendMessage("Assistant", "💡 Command format unrecognized. Try:
+• `show yesterday expense`
+• `add Dinner 25.00 Food`
+• `list`
+• `filter 2026-11-01 2026-11-10`");
+            }
+        }
+
+        async function fetchExpensesByDateRange(fromDate, toDate) {
+            try {
+                const res = await fetch(`/api/frmto/exp/dates?from=${fromDate}&to=${toDate}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+                const data = await res.json();
+                formatAndRenderExpenseList(`Expenses (${fromDate} to ${toDate})`, data);
+            } catch (err) {
+                appendMessage("Assistant", `⚠️ API Call Failed: ${err.message}`, "error");
+            }
+        }
+
+        function formatAndRenderExpenseList(heading, data) {
+            const items = data.items || (Array.isArray(data) ? data : []);
+            if (Array.isArray(items) && items.length > 0) {
+                let formattedList = `📊 **${heading}:**
+
+`;
+                let total = 0;
+                items.forEach((exp, idx) => {
+                    const amt = parseFloat(exp.amount || exp.cost || 0);
+                    total += amt;
+                    formattedList += `${idx + 1}. **${exp.title || exp.name || 'Expense'}** — $${amt.toFixed(2)} (${exp.category || 'General'})
+`;
+                });
+                formattedList += `
+💰 **Total:** $${total.toFixed(2)}`;
+                appendMessage("Assistant", formattedList);
             } else {
-                appendMessage("Assistant", "💡 Available commands:\n• `Add [Title] [Amount] [Category]`\n• `list` (Get all expenses)");
+                appendMessage("Assistant", `📋 Response received:
+\`\`\`json
+${JSON.stringify(data, null, 2)}
+\`\`\``);
             }
         }
     </script>
