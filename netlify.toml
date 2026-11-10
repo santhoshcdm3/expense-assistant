@@ -1,26 +1,28 @@
 [build]
   publish = "frontend"
 
-# 1. Explicit Redirects for Oracle APEX Endpoints
+# 1. Add Expense
 [[redirects]]
   from = "/api/add_exp/newexp"
   to = "https://oracleapex.com/ords/app_exp/add_exp/newexp"
   status = 200
   force = true
 
+# 2. Get All Expenses
 [[redirects]]
   from = "/api/gt/expenses"
   to = "https://oracleapex.com/ords/app_exp/gt/expenses"
   status = 200
   force = true
 
+# 3. Filter Expenses by Dates
 [[redirects]]
   from = "/api/frmto/exp/dates"
   to = "https://oracleapex.com/ords/app_exp/frmto/exp/dates"
   status = 200
   force = true
 
-# 2. Wildcard fallback redirect
+# 4. Catch-all fallback proxy for any future /api/* routes
 [[redirects]]
   from = "/api/*"
   to = "https://oracleapex.com/ords/app_exp/:splat"
