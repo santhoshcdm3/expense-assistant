@@ -261,6 +261,15 @@
             return `${year}-${month}-${day}`;
         }
 
+        function getFormattedDateDDMMYYYY(offsetDays = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() - offsetDays);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${day}/${month}/${year}`;
+        }
+
         async function callApexApi(endpoint, options = {}, timeoutMs = 15000) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -270,6 +279,7 @@
                     ...options,
                     signal: controller.signal,
                     headers: {
+                        'Accept': 'application/json',
                         'Content-Type': 'application/json',
                         ...(options.headers || {})
                     }
@@ -277,10 +287,12 @@
                 clearTimeout(timeoutId);
 
                 if (!response.ok) {
-                    throw new Error(`Oracle APEX returned status ${response.status} (${response.statusText})`);
+                    const errorText = await response.text();
+                    throw new Error(`APEX Error ${response.status}: ${errorText || response.statusText}`);
                 }
 
-                return await response.json();
+                const text = await response.text();
+                return text ? JSON.parse(text) : {};
             } catch (err) {
                 clearTimeout(timeoutId);
                 if (err.name === 'AbortError') {
@@ -334,22 +346,24 @@
             const lowerText = text.toLowerCase();
 
             if (lowerText.includes("yesterday")) {
-                const yesterdayStr = getFormattedDate(1);
-                appendMessage("Assistant", `✨ Fetching yesterday's expense records (${yesterdayStr})...`);
-                await fetchExpensesByDateRange(yesterdayStr, yesterdayStr);
+                const yesterdayISO = getFormattedDate(1);
+                const yesterdayDDMM = getFormattedDateDDMMYYYY(1);
+                appendMessage("Assistant", `✨ Fetching yesterday's expense records (${yesterdayISO})...`);
+                await fetchExpensesByDate(yesterdayISO, yesterdayDDMM);
             }
             else if (lowerText.includes("today")) {
-                const todayStr = getFormattedDate(0);
-                appendMessage("Assistant", `✨ Fetching today's expense records (${todayStr})...`);
-                await fetchExpensesByDateRange(todayStr, todayStr);
+                const todayISO = getFormattedDate(0);
+                const todayDDMM = getFormattedDateDDMMYYYY(0);
+                appendMessage("Assistant", `✨ Fetching today's expense records (${todayISO})...`);
+                await fetchExpensesByDate(todayISO, todayDDMM);
             }
             else if (lowerText.startsWith("add")) {
                 const parts = text.split(" ").filter(p => p.length > 0);
                 if (parts.length < 4) {
-                    appendMessage("Assistant", "💡 Format: `add [Title] [Amount] [Category]` (e.g., `add Coffee 4.50 Food`)", "error");
+                    appendMessage("Assistant", "💡 Format: `add [Description] [Amount] [Category]` (e.g., `add Coffee 4.50 Food`)", "error");
                     return;
                 }
-                const title = parts[1];
+                const description = parts[1];
                 const amount = parseFloat(parts[2]);
                 const category = parts.slice(3).join(" ");
 
@@ -359,11 +373,30 @@
                 }
 
                 try {
+                    // Send exact keys mapped to APEX database schema
+                    const payload = {
+                        description: description,
+                        title: description,
+                        expense_name: description,
+                        share_amount: amount,
+                        amount: amount,
+                        cost: amount,
+                        paid_by_name: "Santhosh",
+                        split_person_name: "Santhosh",
+                        category: category,
+                        type: category
+                    };
+
                     const data = await callApexApi('/api/add_exp/newexp', {
                         method: 'POST',
-                        body: JSON.stringify({ title, amount, category })
+                        body: JSON.stringify(payload)
                     });
-                    appendMessage("Assistant", `✅ Expense added successfully!\n\n• Title: ${title}\n• Amount: ₹${amount.toFixed(2)}\n• Category: ${category}`, "success");
+                    
+                    appendMessage("Assistant", `✅ Expense added successfully!
+
+• Description: ${description}
+• Share Amount: ₹${amount.toFixed(2)}
+• Category: ${category}`, "success");
                 } catch (err) {
                     appendMessage("Assistant", `⚠️ ${err.message}`, "error");
                 }
@@ -385,7 +418,28 @@
                 await fetchExpensesByDateRange(parts[1], parts[2]);
             }
             else {
-                appendMessage("Assistant", "💡 Command not recognized. Try asking:\n• `show yesterday expense`\n• `add Lunch 15.50 Food`\n• `list`\n• `filter 2026-11-01 2026-11-10`");
+                appendMessage("Assistant", "💡 Command not recognized. Try asking:
+• `show yesterday expense`
+• `add Lunch 150 Food`
+• `list`
+• `filter 2026-10-01 2026-10-31`");
+            }
+        }
+
+        async function fetchExpensesByDate(isoDate, ddmmDate) {
+            try {
+                // Try primary APEX endpoint with DD/MM/YYYY query string parameter matching ORDS
+                let data = await callApexApi(`/api/gt/expenses?exp_date=${ddmmDate}`, { method: 'GET' });
+                let items = data.items || (Array.isArray(data) ? data : []);
+
+                // Fallback to date range endpoint if exp_date query is empty
+                if (items.length === 0) {
+                    data = await callApexApi(`/api/frmto/exp/dates?from=${isoDate}&to=${isoDate}`, { method: 'GET' });
+                }
+
+                formatAndRenderList(`Expenses (${isoDate})`, data);
+            } catch (err) {
+                appendMessage("Assistant", `⚠️ ${err.message}`, "error");
             }
         }
 
@@ -401,19 +455,26 @@
         function formatAndRenderList(heading, data) {
             const items = data.items || (Array.isArray(data) ? data : []);
             if (Array.isArray(items) && items.length > 0) {
-                let formattedList = `📊 **${heading}:**\n\n`;
+                let formattedList = `📊 **${heading}:**
+
+`;
                 let total = 0;
                 items.forEach((exp, idx) => {
-                    const title = exp.title || exp.name || exp.description || 'Expense';
-                    const amount = parseFloat(exp.amount || exp.cost || exp.price || 0);
-                    const cat = exp.category || exp.type || 'General';
-                    total += amount;
-                    formattedList += `${idx + 1}. **${title}** — ₹${amount.toFixed(2)} (${cat})\n`;
+                    const desc = exp.description || exp.title || exp.name || 'Expense';
+                    const amt = parseFloat(exp.share_amount || exp.amount || exp.cost || 0);
+                    const paidBy = exp.paid_by_name ? ` (Paid by: ${exp.paid_by_name})` : '';
+                    const splitWith = exp.split_person_name ? ` → Split: ${exp.split_person_name}` : '';
+                    total += amt;
+                    formattedList += `${idx + 1}. **${desc}** — ₹${amt.toFixed(2)}${paidBy}${splitWith}
+`;
                 });
-                formattedList += `\n💰 **Total Spending:** ₹${total.toFixed(2)}`;
+                formattedList += `
+💰 **Total Spending:** ₹${total.toFixed(2)}`;
                 appendMessage("Assistant", formattedList);
             } else {
-                appendMessage("Assistant", `📋 Response from APEX backend:\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``);
+                appendMessage("Assistant", `📅 **${heading}:**
+
+No expense records found for this period.`);
             }
         }
     </script>

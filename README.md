@@ -1,3 +1,3 @@
-# Expense Assistant - Gemini AI Theme
+# Expense Assistant - Oracle APEX & Gemini AI
 
-AI-style expense tracking interface with Oracle APEX ORDS backend integration.
+Fully mapped and synchronized Oracle APEX REST endpoints with Netlify proxy.
