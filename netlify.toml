@@ -1,2 +1,14 @@
 [build]
   publish = "frontend"
+
+[[redirects]]
+  from = "/api/expenses"
+  to = "https://oracleapex.com/ords/app_exp/gt/expenses"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/dates"
+  to = "https://oracleapex.com/ords/app_exp/frmto/exp/dates"
+  status = 200
+  force = true
