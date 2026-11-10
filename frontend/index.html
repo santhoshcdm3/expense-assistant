@@ -128,8 +128,20 @@
     </div>
 
     <script>
-        const EXPENSES_API = "https://oracleapex.com/ords/app_exp/gt/expenses";
-        const DATES_API = "https://oracleapex.com/ords/app_exp/frmto/exp/dates";
+        // Calls go through the Netlify proxy (/api/...) to avoid CORS; if the proxy is missing, fall back to direct APEX URLs.
+        const PROXY = { expenses: "/api/expenses", dates: "/api/dates" };
+        const DIRECT = {
+            expenses: "https://oracleapex.com/ords/app_exp/gt/expenses",
+            dates: "https://oracleapex.com/ords/app_exp/frmto/exp/dates"
+        };
+
+        async function apexFetch(kind, query = "", options = {}) {
+            try {
+                const r = await fetch(PROXY[kind] + query, options);
+                if (r.status !== 404) return r;
+            } catch (e) { /* proxy unreachable, try direct */ }
+            return fetch(DIRECT[kind] + query, options);
+        }
         const TARGET_HASH = "fe5c7fb1f689a05a5f0abe6588a9dbc91f258821e22c2ea773afde776b32bd6e";
 
         async function hashPin(pin) {
@@ -244,7 +256,7 @@
             };
 
             try {
-                const res = await fetch(EXPENSES_API, {
+                const res = await apexFetch("expenses", "", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
@@ -254,10 +266,11 @@
                     appendBotMessage(`✅ Logged to Oracle APEX: **${payload.title}** for **₹${payload.amount}** under *${payload.category}*!`);
                     fetchApexExpenses();
                 } else {
-                    appendBotMessage("⚠️ Oracle APEX API returned an error status.");
+                    const detail = (await res.text()).slice(0, 150);
+                    appendBotMessage(`⚠️ Oracle APEX returned error ${res.status}. ${detail}`);
                 }
             } catch (err) {
-                appendBotMessage("❌ Could not connect to Oracle APEX endpoint (CORS or network issue).");
+                appendBotMessage("❌ Could not connect to Oracle APEX endpoint (CORS or network issue): " + err.message);
             }
         }
 
@@ -310,16 +323,20 @@
             const startDate = document.getElementById("filterStartDate").value;
             const endDate = document.getElementById("filterEndDate").value;
 
-            let url = EXPENSES_API;
+            let kind = "expenses";
+            let query = "";
 
             if (startDate && endDate) {
-                url = `${DATES_API}?start_date=${startDate}&end_date=${endDate}`;
+                kind = "dates";
+                query = `?start_date=${startDate}&end_date=${endDate}`;
             } else if (singleDate) {
-                url = `${DATES_API}?single_date=${singleDate}`;
+                kind = "dates";
+                query = `?single_date=${singleDate}`;
             }
 
             try {
-                const res = await fetch(url);
+                const res = await apexFetch(kind, query);
+                if (!res.ok) throw new Error("HTTP " + res.status);
                 const data = await res.json();
                 
                 const list = document.getElementById("recordsList");
@@ -350,7 +367,7 @@
                 document.getElementById("totalSum").innerText = `₹${sum.toFixed(2)}`;
             } catch (err) {
                 console.error("APEX Fetch error", err);
-                document.getElementById("recordsList").innerHTML = `<div class="text-rose-400 text-[10px]">Failed to load Oracle APEX records (CORS policy or endpoint offline).</div>`;
+                document.getElementById("recordsList").innerHTML = `<div class="text-rose-400 text-[10px]">Failed to load Oracle APEX records: ${escapeHtml(err.message)}</div>`;
             }
         }
 
