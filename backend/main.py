@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date
 
-app = FastAPI(title="Expense Assistant API")
+app = FastAPI(title="Expense Assistant Chatbot API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,9 +18,8 @@ class ExpenseCreate(BaseModel):
     title: str
     amount: float
     category: str
-    expense_date: date  # Format: YYYY-MM-DD
+    expense_date: date
 
-# In-memory database mock (replace with SQLite / database connection)
 expenses_db = []
 
 @app.post("/expenses", status_code=201)
@@ -43,11 +42,8 @@ def get_expenses(
 ):
     filtered = expenses_db
     
-    # Filter by exact single date
     if single_date:
         filtered = [e for e in filtered if e["expense_date"] == single_date.isoformat()]
-    
-    # Filter by date range
     elif start_date and end_date:
         filtered = [e for e in filtered if start_date.isoformat() <= e["expense_date"] <= end_date.isoformat()]
     elif start_date:

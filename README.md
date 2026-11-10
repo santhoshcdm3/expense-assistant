@@ -1,13 +1,9 @@
-# Expense Assistant with Tamil Voice Recognition & Translation
+# Expense Assistant Chatbot Full Package
 
-## Features
-- **FastAPI Backend**:
-  - Add expense records (`POST /expenses`).
-  - Retrieve expenses with single-date & date-range filters (`GET /expenses`).
-- **Frontend with Tamil Voice Input**:
-  - Built-in browser speech recognition configured for **Tamil (`ta-IN`)**.
-  - Automatic Tamil-to-English translation & intelligent form auto-fill for amount, title, and category.
-  - Date picker & filtering capabilities.
+## Contents
+- `backend/main.py`: FastAPI application supporting POST/GET operations and date filtering.
+- `frontend/index.html`: Web Chatbot UI featuring secure SHA-256 passcode verification, Tamil voice input (`ta-IN`), translation API integration, and real-time dashboard analytics.
+- `netlify.toml`: Netlify configuration.
 
 ## How to Run
 
@@ -15,8 +11,9 @@
    ```bash
    cd backend
    pip install fastapi uvicorn pydantic
-   uvicorn main:app --reload
+   uvicorn main:app --reload --port 8000
    ```
 
 2. **Frontend**:
-   - Open `frontend/index.html` directly in Google Chrome (or serve via standard static file server).
+   - Open `frontend/index.html` in Google Chrome.
+   - Enter your passcode to access the chatbot interface.
