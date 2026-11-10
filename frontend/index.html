@@ -113,7 +113,7 @@
                     <button onclick="sendQuickPrompt('list')" class="gemini-pill text-left p-4 rounded-2xl flex flex-col justify-between gap-3 group">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-[#c5b4e3] font-medium uppercase tracking-wider">Analytics</span>
-                            <i class="fa-solid fa-[#c5b4e3] fa-list-ul text-[#c5b4e3]"></i>
+                            <i class="fa-solid fa-list-ul text-[#c5b4e3]"></i>
                         </div>
                         <p class="text-sm text-[#e3e3e3] group-hover:text-white">"list" (All Recent Expenses)</p>
                     </button>
@@ -363,11 +363,7 @@
                         method: 'POST',
                         body: JSON.stringify({ title, amount, category })
                     });
-                    appendMessage("Assistant", `✅ Expense added successfully!
-
-• Title: ${title}
-• Amount: ₹${amount.toFixed(2)}
-• Category: ${category}`, "success");
+                    appendMessage("Assistant", `✅ Expense added successfully!\n\n• Title: ${title}\n• Amount: ₹${amount.toFixed(2)}\n• Category: ${category}`, "success");
                 } catch (err) {
                     appendMessage("Assistant", `⚠️ ${err.message}`, "error");
                 }
@@ -389,11 +385,7 @@
                 await fetchExpensesByDateRange(parts[1], parts[2]);
             }
             else {
-                appendMessage("Assistant", "💡 Command not recognized. Try asking:
-• `show yesterday expense`
-• `add Lunch 15.50 Food`
-• `list`
-• `filter 2026-11-01 2026-11-10`");
+                appendMessage("Assistant", "💡 Command not recognized. Try asking:\n• `show yesterday expense`\n• `add Lunch 15.50 Food`\n• `list`\n• `filter 2026-11-01 2026-11-10`");
             }
         }
 
@@ -409,26 +401,19 @@
         function formatAndRenderList(heading, data) {
             const items = data.items || (Array.isArray(data) ? data : []);
             if (Array.isArray(items) && items.length > 0) {
-                let formattedList = `📊 **${heading}:**
-
-`;
+                let formattedList = `📊 **${heading}:**\n\n`;
                 let total = 0;
                 items.forEach((exp, idx) => {
                     const title = exp.title || exp.name || exp.description || 'Expense';
                     const amount = parseFloat(exp.amount || exp.cost || exp.price || 0);
                     const cat = exp.category || exp.type || 'General';
                     total += amount;
-                    formattedList += `${idx + 1}. **${title}** — ₹${amount.toFixed(2)} (${cat})
-`;
+                    formattedList += `${idx + 1}. **${title}** — ₹${amount.toFixed(2)} (${cat})\n`;
                 });
-                formattedList += `
-💰 **Total Spending:** ₹${total.toFixed(2)}`;
+                formattedList += `\n💰 **Total Spending:** ₹${total.toFixed(2)}`;
                 appendMessage("Assistant", formattedList);
             } else {
-                appendMessage("Assistant", `📋 Response from APEX backend:
-\`\`\`json
-${JSON.stringify(data, null, 2)}
-\`\`\``);
+                appendMessage("Assistant", `📋 Response from APEX backend:\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``);
             }
         }
     </script>
